@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Kinematics & Python Export</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        body { font-family: 'Poppins', sans-serif; background-color: #f0fdfa; color: #1f2937; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); padding: 1.5rem; }
+        input[type="number"] { width: 100%; padding: 0.5rem; border: 1px solid #ccfbf1; border-radius: 8px; outline: none; transition: border-color 0.2s; background: #f0fdfa; }
+        input[type="number"]:focus { border-color: #14b8a6; }
+        .btn-active { background-color: #0d9488; color: white; border-color: #0d9488; }
+        .btn-inactive { background-color: transparent; color: #0d9488; border-color: #0d9488; }
+        canvas { display: block; }
+        
+        /* Modal Styles */
+        pre { font-family: 'Fira Code', monospace; font-size: 0.85rem; white-space: pre-wrap; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 50; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex flex-col gap-6 max-w-7xl mx-auto">
+
+    <header class="flex flex-col md:flex-row justify-between items-center gap-4 card bg-teal-600 text-white !shadow-teal-900/20">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight">Kinematics Simulator</h1>
+            <p class="text-teal-100 text-sm">Basic mechanism analysis</p>
+        </div>
+        <div class="flex flex-wrap justify-center gap-3">
+            <button onclick="showCode()" class="bg-teal-500 hover:bg-teal-400 px-4 py-2 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.478 1.647a.5.5 0 1 0-.956-.294l-4 13a.5.5 0 0 0 .956.294l4-13zM4.854 4.146a.5.5 0 0 1 0 .708L1.707 8l3.147 3.146a.5.5 0 0 1-.708.708l-3.5-3.5a.5.5 0 0 1 0-.708l3.5-3.5a.5.5 0 0 1 .708 0zm6.292 0a.5.5 0 0 0 0 .708L14.293 8l-3.147 3.146a.5.5 0 0 0 .708.708l3.5-3.5a.5.5 0 0 0 0-.708l-3.5-3.5a.5.5 0 0 0-.708 0z"/></svg>
+                View Python Code
+            </button>
+            <div class="flex bg-white/20 p-1 rounded-lg">
+                <button onclick="setMode('slider')" id="btn-slider" class="px-6 py-2 rounded-md font-medium text-sm transition bg-white text-teal-700 shadow-sm">Slider-Crank</button>
+                <button onclick="setMode('fourbar')" id="btn-fourbar" class="px-6 py-2 rounded-md font-medium text-sm transition text-white hover:bg-white/10">Four-Bar</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="card flex flex-col gap-4">
+            <h2 class="text-lg font-semibold border-b border-teal-50 pb-2 text-teal-800">Parameters</h2>
+            
+            <div id="inputs-slider" class="flex flex-col gap-3">
+                <div><label class="text-xs text-gray-500 font-medium">Crank (r)</label><input type="number" id="s-r" value="0.1" step="0.01"></div>
+                <div><label class="text-xs text-gray-500 font-medium">Rod (l)</label><input type="number" id="s-l" value="0.3" step="0.01"></div>
+                <div><label class="text-xs text-gray-500 font-medium">Velocity (ω)</label><input type="number" id="s-w" value="10" step="0.5"></div>
+            </div>
+
+            <div id="inputs-fourbar" class="flex flex-col gap-3 hidden">
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs text-gray-500 font-medium">Fixed (L1)</label><input type="number" id="f-l1" value="0.4" step="0.01"></div>
+                    <div><label class="text-xs text-gray-500 font-medium">Crank (L2)</label><input type="number" id="f-l2" value="0.15" step="0.01"></div>
+                    <div><label class="text-xs text-gray-500 font-medium">Coupler (L3)</label><input type="number" id="f-l3" value="0.35" step="0.01"></div>
+                    <div><label class="text-xs text-gray-500 font-medium">Follower (L4)</label><input type="number" id="f-l4" value="0.3" step="0.01"></div>
+                </div>
+                <div><label class="text-xs text-gray-500 font-medium">Velocity (ω2)</label><input type="number" id="f-w2" value="10" step="0.5"></div>
+            </div>
+
+            <button onclick="togglePlay()" id="play-pause" class="mt-auto bg-teal-500 hover:bg-teal-600 text-white font-semibold py-3 rounded-xl shadow-md transition">Pause Simulation</button>
+        </div>
+
+        <div class="card lg:col-span-2 flex flex-col relative h-[400px] !p-0 overflow-hidden border-2 border-teal-100">
+            <div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded shadow-sm text-sm font-semibold text-teal-800" id="mech-status">Standard Mechanism</div>
+            <canvas id="simCanvas" class="w-full h-full bg-slate-50"></canvas>
+        </div>
+    </div>
+
+    <div class="card overflow-hidden">
+        <h2 class="text-lg font-semibold text-teal-800 mb-4">Data Results</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs uppercase bg-teal-50 text-teal-700" id="table-head"></thead>
+                <tbody class="divide-y divide-teal-50" id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="text-lg font-semibold text-teal-800 mb-4">Simple Graphs (0° - 360°)</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="graphs-container">
+            <div class="h-48"><canvas id="chart1"></canvas></div>
+            <div class="h-48"><canvas id="chart2"></canvas></div>
+            <div class="h-48"><canvas id="chart3"></canvas></div>
+            <div class="h-48"><canvas id="chart4"></canvas></div>
+        </div>
+    </div>
+
+    <div id="codeModal" class="modal" onclick="closeCode()">
+        <div class="bg-slate-900 text-slate-100 w-11/12 max-w-4xl max-h-[85vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl" onclick="event.stopPropagation()">
+            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-teal-400" id="modalTitle">Python Implementation</h3>
+                <button onclick="closeCode()" class="text-slate-400 hover:text-white transition">✕ Close</button>
+            </div>
+            <div class="p-6 overflow-y-auto bg-slate-950 flex-1">
+                <pre id="pythonCodeBlock" class="text-teal-50"></pre>
+            </div>
+            <div class="p-4 border-t border-slate-800 flex justify-end">
+                <button onclick="copyCode()" class="bg-teal-600 hover:bg-teal-500 px-6 py-2 rounded-lg font-bold text-sm transition">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Extremely Simplified State
+        const state = {
+            mode: 'slider', 
+            isPlaying: true,
+            theta: 0,
+            dir: 1,
+            slider: { r: 0.1, l: 0.3, w: 10 },
+            fourbar: { l1: 0.4, l2: 0.15, l3: 0.35, l4: 0.3, w2: 10 }, // mode removed (crossed by default)
+            angles: [0, 45, 90, 135, 180, 225, 270, 315, 360],
+            charts: []
+        };
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        let lastTime = performance.now();
+
+        // -----------------------------
+        // Python Templates for Modal
+        // -----------------------------
+        const pythonTemplates = {
+            slider: `import math
+
+
+r = float(input("Enter crank length (r): "))
+l = float(input("Enter connecting rod length (l): "))
+w = float(input("Enter crank angular velocity (ω): "))
+theta = float(input("Enter crank angle (θ in radians): "))
+
+
+
+sin_phi = -(r * math.sin(theta) / l)
+
+
+cos_phi = math.sqrt(1 - sin_phi**2)
+
+
+
+omega2 = -(r * w * math.cos(theta)) / (l * cos_phi)
+
+
+
+v_slider = -r * w * math.sin(theta) - l * sin_phi * omega2
+
+
+
+alpha2 = (r * w**2 * math.sin(theta) + l * omega2**2 * sin_phi) / (l * cos_phi)
+
+
+
+a_slider = -r * w**2 * math.cos(theta) - l * (alpha2 * sin_phi + omega2**2 * cos_phi)
+
+
+
+print("\\n--- RESULTS ---")
+print("Angular position of connecting rod (phi) =", math.asin(sin_phi), "radians")
+print("Angular velocity of connecting rod (ω2) =", omega2, "rad/s")
+print("Velocity of slider (v_s) =", v_slider, "m/s")
+print("Angular acceleration of connecting rod (α2) =", alpha2, "rad/s²")
+print("Acceleration of slider (a_s) =", a_slider, "m/s²")`,
+
+            fourbar: `import numpy as np
+
+print("4-Bar Mechanism Calculator")
+
+L1 = float(input("Enter L1: "))
+L2 = float(input("Enter L2: "))
+L3 = float(input("Enter L3: "))
+L4 = float(input("Enter L4: "))
+omega2 = float(input("Enter w2: "))
+
+deg = float(input("Enter crank angle (deg): "))
+t2 = np.radians(deg)
+
+alpha2 = 0
+
+
+A = 2 * L4 * (L1 - L2 * np.cos(t2))
+B = -2 * L2 * L4 * np.sin(t2)
+C = L1**2 + L2**2 + L4**2 - L3**2 - 2 * L1 * L2 * np.cos(t2)
+
+D = A**2 + B**2 - C**2
+
+if D < 0:
+    print("Mechanism not possible at this angle")
+
+else:
+    t4 = 2 * np.arctan2(-B - np.sqrt(D), C - A)
+
+    sin_t3 = (L4 * np.sin(t4) - L2 * np.sin(t2)) / L3
+    cos_t3 = (L1 + L4 * np.cos(t4) - L2 * np.cos(t2)) / L3
+    t3 = np.arctan2(sin_t3, cos_t3)
+
+    den = np.sin(t3 - t4)
+
+    if abs(den) < 1e-6:
+        print("Dead center position")
+
+    else:
+        # Velocity
+        w3 = (L2 * omega2 * np.sin(t4 - t2)) / (L3 * den)
+        w4 = (L2 * omega2 * np.sin(t3 - t2)) / (L4 * den)
+
+        # Acceleration
+        C1 = (L2 * alpha2 * np.sin(t2)
+              + L2 * omega2**2 * np.cos(t2)
+              + L3 * w3**2 * np.cos(t3)
+              - L4 * w4**2 * np.cos(t4))
+
+        C2 = (-L2 * alpha2 * np.cos(t2)
+              + L2 * omega2**2 * np.sin(t2)
+              + L3 * w3**2 * np.sin(t3)
+              - L4 * w4**2 * np.sin(t4))
+
+        a3 = -(C1 * np.cos(t4) + C2 * np.sin(t4)) / (L3 * den)
+        a4 = -(C1 * np.cos(t3) + C2 * np.sin(t3)) / (L4 * den)
+
+
+        print("\\n--- RESULTS ---")
+        print("w3 =", w3)
+        print("w4 =", w4)
+        print("a3 =", a3)
+        print("a4 =", a4)`
+        };
+
+        // Modal Functions
+        function showCode() {
+            const modal = document.getElementById('codeModal');
+            const codeBlock = document.getElementById('pythonCodeBlock');
+            const title = document.getElementById('modalTitle');
+            
+            title.innerText = state.mode === 'slider' ? 'Python: Slider-Crank Logic' : 'Python: Four-Bar Logic';
+            codeBlock.innerText = pythonTemplates[state.mode];
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden'; 
+        }
+
+        function closeCode() {
+            document.getElementById('codeModal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function copyCode() {
+            const code = document.getElementById('pythonCodeBlock').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                alert("Code copied to clipboard!");
+            });
+        }
+
+        // Basic Math Solvers (JS context for UI drawing/graphs)
+        function solveSlider(r, l, w, th) {
+            const n = l / r; const sin_th = Math.sin(th); const cos_th = Math.cos(th);
+            if (Math.abs(sin_th / n) > 1) return null;
+            const sin_phi = sin_th / n; const cos_phi = Math.sqrt(1 - sin_phi*sin_phi);
+            const w_rod = (r * w * cos_th) / (l * cos_phi);
+            const v_s = -r * w * sin_th - l * w_rod * sin_phi;
+            const alp_rod = (-r * w*w * sin_th + l * w_rod*w_rod * sin_phi) / (l * cos_phi);
+            const a_s = -r * w*w * cos_th - l * alp_rod * sin_phi - l * w_rod*w_rod * cos_phi;
+            return { w_rod, v_s, alp_rod, a_s };
+        }
+
+        function solveFourBar(l1, l2, l3, l4, w2, th2) {
+            const k1 = l1/l2; const k2 = l1/l4; const k3 = (l1*l1 + l2*l2 - l3*l3 + l4*l4) / (2*l2*l4);
+            const A = Math.cos(th2) - k1 - k2*Math.cos(th2) + k3;
+            const B = -2*Math.sin(th2);
+            const C = k1 - (k2+1)*Math.cos(th2) + k3;
+            const disc = B*B - 4*A*C;
+            if (disc < 0) return null;
+            
+            // Hardcoded strictly to crossed mechanism (- Math.sqrt)
+            const th4 = 2 * Math.atan((-B - Math.sqrt(disc)) / (2*A));
+            const th3 = Math.atan2(l4*Math.sin(th4) - l2*Math.sin(th2), l1 + l4*Math.cos(th4) - l2*Math.cos(th2));
+            const den = Math.sin(th3 - th4);
+            if (Math.abs(den) < 1e-5) return null;
+            const w3 = (l2*w2*Math.sin(th4 - th2)) / (l3*den);
+            const w4 = (l2*w2*Math.sin(th3 - th2)) / (l4*den);
+            const P = -l2*w2*w2*Math.cos(th2) - l3*w3*w3*Math.cos(th3) + l4*w4*w4*Math.cos(th4);
+            const Q = -l2*w2*w2*Math.sin(th2) - l3*w3*w3*Math.sin(th3) + l4*w4*w4*Math.sin(th4);
+            const alp3 = (P*Math.cos(th4) + Q*Math.sin(th4)) / (l3*den);
+            const alp4 = (P*Math.cos(th3) + Q*Math.sin(th3)) / (l4*den);
+            return { w3, w4, alp3, alp4, th3, th4 };
+        }
+
+        // Logic & Data
+        function setMode(mode) {
+            state.mode = mode;
+            state.theta = 0; state.dir = 1;
+            document.getElementById('inputs-slider').style.display = mode === 'slider' ? 'flex' : 'none';
+            document.getElementById('inputs-fourbar').style.display = mode === 'fourbar' ? 'grid' : 'none';
+            
+            const bAct = "px-6 py-2 rounded-md font-medium text-sm transition bg-white text-teal-700 shadow-sm";
+            const bInact = "px-6 py-2 rounded-md font-medium text-sm transition text-white hover:bg-white/10";
+            document.getElementById('btn-slider').className = mode === 'slider' ? bAct : bInact;
+            document.getElementById('btn-fourbar').className = mode === 'fourbar' ? bAct : bInact;
+            updateData();
+        }
+
+        function togglePlay() {
+            state.isPlaying = !state.isPlaying;
+            document.getElementById('play-pause').innerText = state.isPlaying ? "Pause Simulation" : "Resume Simulation";
+        }
+
+        function readInputs() {
+            if(state.mode === 'slider') {
+                state.slider.r = parseFloat(document.getElementById('s-r').value)||0.1;
+                state.slider.l = parseFloat(document.getElementById('s-l').value)||0.3;
+                state.slider.w = parseFloat(document.getElementById('s-w').value)||10;
+            } else {
+                state.fourbar.l1 = parseFloat(document.getElementById('f-l1').value)||0.4;
+                state.fourbar.l2 = parseFloat(document.getElementById('f-l2').value)||0.15;
+                state.fourbar.l3 = parseFloat(document.getElementById('f-l3').value)||0.35;
+                state.fourbar.l4 = parseFloat(document.getElementById('f-l4').value)||0.3;
+                state.fourbar.w2 = parseFloat(document.getElementById('f-w2').value)||10;
+            }
+        }
+
+        function updateData() {
+            readInputs();
+            let thHTML = '', tbHTML = '';
+            let gData = { y1:[], y2:[], y3:[], y4:[], lbls:[] };
+
+            if(state.mode === 'slider') {
+                thHTML = `<tr><th class="p-2">Angle</th><th class="p-2">ω (Rod)</th><th class="p-2">α (Rod)</th><th class="p-2">v (Slider)</th><th class="p-2">a (Slider)</th></tr>`;
+                state.angles.forEach(deg => {
+                    const r = solveSlider(state.slider.r, state.slider.l, state.slider.w, deg * Math.PI/180);
+                    if(r) tbHTML += `<tr class="border-b"><td class="p-2">${deg}°</td><td class="p-2">${r.w_rod.toFixed(2)}</td><td class="p-2">${r.alp_rod.toFixed(2)}</td><td class="p-2">${r.v_s.toFixed(2)}</td><td class="p-2">${r.a_s.toFixed(2)}</td></tr>`;
+                    else tbHTML += `<tr><td class="p-2">${deg}°</td><td colspan="4" class="p-2 text-red-500">Locked</td></tr>`;
+                });
+                for(let i=0; i<=360; i+=5) {
+                    gData.lbls.push(i); const r = solveSlider(state.slider.r, state.slider.l, state.slider.w, i * Math.PI/180);
+                    gData.y1.push(r ? r.w_rod : null); gData.y2.push(r ? r.v_s : null);
+                    gData.y3.push(r ? r.alp_rod : null); gData.y4.push(r ? r.a_s : null);
+                }
+            } else {
+                thHTML = `<tr><th class="p-2">Angle</th><th class="p-2">ω3 (Coupler)</th><th class="p-2">ω4 (Follower)</th><th class="p-2">α3</th><th class="p-2">α4</th></tr>`;
+                state.angles.forEach(deg => {
+                    const r = solveFourBar(state.fourbar.l1, state.fourbar.l2, state.fourbar.l3, state.fourbar.l4, state.fourbar.w2, deg * Math.PI/180);
+                    if(r) tbHTML += `<tr class="border-b"><td class="p-2">${deg}°</td><td class="p-2">${r.w3.toFixed(2)}</td><td class="p-2">${r.w4.toFixed(2)}</td><td class="p-2">${r.alp3.toFixed(2)}</td><td class="p-2">${r.alp4.toFixed(2)}</td></tr>`;
+                    else tbHTML += `<tr><td class="p-2">${deg}°</td><td colspan="4" class="p-2 text-red-500">Locked</td></tr>`;
+                });
+                for(let i=0; i<=360; i+=5) {
+                    gData.lbls.push(i); const r = solveFourBar(state.fourbar.l1, state.fourbar.l2, state.fourbar.l3, state.fourbar.l4, state.fourbar.w2, i * Math.PI/180);
+                    gData.y1.push(r ? r.w3 : null); gData.y2.push(r ? r.w4 : null);
+                    gData.y3.push(r ? r.alp3 : null); gData.y4.push(r ? r.alp4 : null);
+                }
+            }
+            document.getElementById('table-head').innerHTML = thHTML;
+            document.getElementById('table-body').innerHTML = tbHTML;
+            drawGraphs(gData);
+        }
+
+        // Very Simple Charts
+        function drawGraphs(data) {
+            state.charts.forEach(c => c.destroy()); state.charts = [];
+            const titles = state.mode === 'slider' 
+                ? ['Rod Velocity', 'Slider Velocity', 'Rod Accel', 'Slider Accel'] 
+                : ['Coupler Vel (ω3)', 'Follower Vel (ω4)', 'Coupler Accel (α3)', 'Follower Accel (α4)'];
+            const colors = ['#0d9488', '#2563eb', '#c026d3', '#ea580c'];
+            
+            [data.y1, data.y2, data.y3, data.y4].forEach((yData, i) => {
+                const ctx = document.getElementById(`chart${i+1}`).getContext('2d');
+                state.charts.push(new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: data.lbls, datasets: [{ data: yData, borderColor: colors[i], borderWidth: 2, pointRadius: 0, tension: 0.1 }] },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, 
+                        plugins: { legend: { display: false }, title: { display: true, text: titles[i], font: {family: 'Poppins', size: 12} } },
+                        scales: { x: { display: false }, y: { display: true, grid: { display: false } } }
+                    }
+                }));
+            });
+        }
+
+        // Simple Drawing Engine
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const w = Math.round(rect.width);
+            const h = Math.round(rect.height);
+            if(canvas.width !== w || canvas.height !== h) { 
+                canvas.width = w; 
+                canvas.height = h; 
+            }
+        }
+
+        function drawLine(x1, y1, x2, y2, col, w) {
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
+        }
+
+        function drawJoint(x, y, sc) {
+            ctx.beginPath(); ctx.arc(x, y, 6/sc, 0, Math.PI*2); ctx.fillStyle = 'white'; ctx.fill();
+            ctx.lineWidth = 2/sc; ctx.strokeStyle = '#334155'; ctx.stroke();
+            ctx.beginPath(); ctx.arc(x, y, 2/sc, 0, Math.PI*2); ctx.fillStyle = '#334155'; ctx.fill();
+        }
+
+        function stepSimulation(dt) {
+            if(!state.isPlaying) return;
+            if(state.mode === 'slider') {
+                const { r, l, w } = state.slider;
+                let nx = state.theta + w * state.dir * dt;
+                if(r > l && Math.abs(r*Math.sin(nx)) > l) state.dir *= -1;
+                else state.theta = (nx + 2*Math.PI) % (2*Math.PI);
+                document.getElementById('mech-status').innerText = l > r ? "Standard Slider" : "Rocker-Slider";
+            } else {
+                const { l1, l2, l3, l4, w2 } = state.fourbar;
+                const max = Math.max(l1, l2, l3, l4);
+                if(max >= l1+l2+l3+l4-max) { document.getElementById('mech-status').innerText = "Invalid Assembly"; return; }
+                let nx = state.theta + w2 * state.dir * dt;
+                let d = Math.sqrt(l1*l1 + l2*l2 - 2*l1*l2*Math.cos(nx));
+                if(d > l3+l4 || d < Math.abs(l3-l4)) state.dir *= -1;
+                else state.theta = (nx + 2*Math.PI) % (2*Math.PI);
+                document.getElementById('mech-status').innerText = "Four-Bar Linkage";
+            }
+        }
+
+        function animate(t) {
+            let dt = (t - lastTime)/1000; if(dt > 0.1 || isNaN(dt)) dt = 0.016; lastTime = t;
+            resize(); stepSimulation(dt);
+            
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            ctx.save(); ctx.translate(canvas.width/2, canvas.height/2); ctx.scale(1, -1);
+
+            if(state.mode === 'slider') {
+                const {r, l} = state.slider; const sc = (canvas.height*0.35) / (r+l); ctx.scale(sc, sc); ctx.translate(-(r+l)/2, 0);
+                const xA = r*Math.cos(state.theta); const yA = r*Math.sin(state.theta);
+                const und = l*l - yA*yA; const xB = und < 0 ? xA+l : xA + Math.sqrt(und);
+                
+                drawLine(-r*1.5, 0, (r+l)*1.2, 0, '#cbd5e1', 4/sc); // Track
+                drawLine(0, 0, xA, yA, '#0d9488', 8/sc); // Crank
+                drawLine(xA, yA, xB, 0, '#94a3b8', 8/sc); // Rod
+                ctx.fillStyle = '#64748b'; ctx.fillRect(xB - (r+l)*0.1, - (r+l)*0.05, (r+l)*0.2, (r+l)*0.1); // Slider
+                drawJoint(0, 0, sc); drawJoint(xA, yA, sc); drawJoint(xB, 0, sc);
+            } else {
+                const {l1, l2, l3, l4} = state.fourbar; const sc = (canvas.height*0.35) / Math.max(l1, l2+l3, l4); ctx.scale(sc, sc); ctx.translate(-l1/2, 0);
+                const max = Math.max(l1, l2, l3, l4);
+                if(max < l1+l2+l3+l4-max) {
+                    const xA = l2*Math.cos(state.theta); const yA = l2*Math.sin(state.theta);
+                    const d = Math.sqrt((l1-xA)**2 + yA**2);
+                    if(d <= l3+l4 && d >= Math.abs(l3-l4)) {
+                        const a = (l3*l3 - l4*l4 + d*d) / (2*d); const h = Math.sqrt(Math.max(0, l3*l3 - a*a));
+                        const pX = xA + a*(l1-xA)/d; const pY = yA + a*(0-yA)/d;
+                        
+                        // Hardcoded strictly to crossed mechanism (-h)
+                        const xB = pX - h*(0-yA)/d; 
+                        const yB = pY + h*(l1-xA)/d;
+                        
+                        drawLine(0,0, l1,0, '#cbd5e1', 12/sc);
+                        drawLine(0,0, xA,yA, '#0d9488', 8/sc);
+                        drawLine(xA,yA, xB,yB, '#94a3b8', 8/sc);
+                        drawLine(l1,0, xB,yB, '#3b82f6', 8/sc);
+                        drawJoint(0, 0, sc); drawJoint(l1, 0, sc); drawJoint(xA, yA, sc); drawJoint(xB, yB, sc);
+                    }
+                }
+            }
+            ctx.restore();
+            requestAnimationFrame(animate);
+        }
+
+        document.querySelectorAll('input').forEach(i => i.addEventListener('input', updateData));
+        window.onload = () => { updateData(); requestAnimationFrame(animate); };
+        
+        // Close modal on Escape key press
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('codeModal').classList.contains('active')) {
+                closeCode();
+            }
+        });
+    </script>
+</body>
+</html>
