@@ -10,7 +10,8 @@
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
         body { font-family: 'Poppins', sans-serif; background-color: #f0fdfa; color: #1f2937; }
         .card { background: white; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); padding: 1.5rem; }
-        input[type="number"] { width: 100%; padding: 0.5rem; border: 1px solid #ccfbf1; border-radius: 8px; outline: none; transition: border-color 0.2s; background: #f0fdfa; }
+        input[type="number"], input[type="radio"] { cursor: pointer; }
+        input[type="number"] { width: 100%; padding: 0.5rem; border: 1px solid #ccfbf1; border-radius: 8px; outline: none; transition: border-color 0.2s; background: #f0fdfa; cursor: text; }
         input[type="number"]:focus { border-color: #14b8a6; }
         .btn-active { background-color: #0d9488; color: white; border-color: #0d9488; }
         .btn-inactive { background-color: transparent; color: #0d9488; border-color: #0d9488; }
@@ -59,7 +60,16 @@
                     <div><label class="text-xs text-gray-500 font-medium">Coupler (L3)</label><input type="number" id="f-l3" value="0.35" step="0.01"></div>
                     <div><label class="text-xs text-gray-500 font-medium">Follower (L4)</label><input type="number" id="f-l4" value="0.3" step="0.01"></div>
                 </div>
-                <div><label class="text-xs text-gray-500 font-medium">Velocity (ω2)</label><input type="number" id="f-w2" value="10" step="0.5"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs text-gray-500 font-medium">Velocity (ω2)</label><input type="number" id="f-w2" value="10" step="0.5"></div>
+                    <div>
+                        <label class="text-xs text-gray-500 font-medium block mb-1">Assembly Mode</label>
+                        <div class="flex gap-2">
+                            <label class="text-sm flex items-center gap-1"><input type="radio" name="assembly" value="-1" checked onchange="updateAssembly(-1)"> Crossed</label>
+                            <label class="text-sm flex items-center gap-1"><input type="radio" name="assembly" value="1" onchange="updateAssembly(1)"> Open</label>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <button onclick="togglePlay()" id="play-pause" class="mt-auto bg-teal-500 hover:bg-teal-600 text-white font-semibold py-3 rounded-xl shadow-md transition">Pause Simulation</button>
@@ -114,7 +124,7 @@
             theta: 0,
             dir: 1,
             slider: { r: 0.1, l: 0.3, w: 10 },
-            fourbar: { l1: 0.4, l2: 0.15, l3: 0.35, l4: 0.3, w2: 10 }, // mode removed (crossed by default)
+            fourbar: { l1: 0.4, l2: 0.15, l3: 0.35, l4: 0.3, w2: 10, assembly: -1 }, // -1 Crossed, +1 Open
             angles: [0, 45, 90, 135, 180, 225, 270, 315, 360],
             charts: []
         };
@@ -129,36 +139,19 @@
         const pythonTemplates = {
             slider: `import math
 
-
 r = float(input("Enter crank length (r): "))
 l = float(input("Enter connecting rod length (l): "))
 w = float(input("Enter crank angular velocity (ω): "))
 theta = float(input("Enter crank angle (θ in radians): "))
 
-
-
 sin_phi = -(r * math.sin(theta) / l)
-
-
 cos_phi = math.sqrt(1 - sin_phi**2)
 
-
-
 omega2 = -(r * w * math.cos(theta)) / (l * cos_phi)
-
-
-
 v_slider = -r * w * math.sin(theta) - l * sin_phi * omega2
 
-
-
 alpha2 = (r * w**2 * math.sin(theta) + l * omega2**2 * sin_phi) / (l * cos_phi)
-
-
-
 a_slider = -r * w**2 * math.cos(theta) - l * (alpha2 * sin_phi + omega2**2 * cos_phi)
-
-
 
 print("\\n--- RESULTS ---")
 print("Angular position of connecting rod (phi) =", math.asin(sin_phi), "radians")
@@ -176,12 +169,12 @@ L2 = float(input("Enter L2: "))
 L3 = float(input("Enter L3: "))
 L4 = float(input("Enter L4: "))
 omega2 = float(input("Enter w2: "))
+branch = int(input("Enter assembly mode (-1 for crossed, 1 for open): "))
 
 deg = float(input("Enter crank angle (deg): "))
 t2 = np.radians(deg)
 
 alpha2 = 0
-
 
 A = 2 * L4 * (L1 - L2 * np.cos(t2))
 B = -2 * L2 * L4 * np.sin(t2)
@@ -193,7 +186,8 @@ if D < 0:
     print("Mechanism not possible at this angle")
 
 else:
-    t4 = 2 * np.arctan2(-B - np.sqrt(D), C - A)
+    # Use branch to determine open (+1) or crossed (-1)
+    t4 = 2 * np.arctan2(-B + branch * np.sqrt(D), C - A)
 
     sin_t3 = (L4 * np.sin(t4) - L2 * np.sin(t2)) / L3
     cos_t3 = (L1 + L4 * np.cos(t4) - L2 * np.cos(t2)) / L3
@@ -222,7 +216,6 @@ else:
 
         a3 = -(C1 * np.cos(t4) + C2 * np.sin(t4)) / (L3 * den)
         a4 = -(C1 * np.cos(t3) + C2 * np.sin(t3)) / (L4 * den)
-
 
         print("\\n--- RESULTS ---")
         print("w3 =", w3)
@@ -255,6 +248,11 @@ else:
             });
         }
 
+        function updateAssembly(val) {
+            state.fourbar.assembly = val;
+            updateData();
+        }
+
         // Basic Math Solvers (JS context for UI drawing/graphs)
         function solveSlider(r, l, w, th) {
             const n = l / r; const sin_th = Math.sin(th); const cos_th = Math.cos(th);
@@ -267,7 +265,7 @@ else:
             return { w_rod, v_s, alp_rod, a_s };
         }
 
-        function solveFourBar(l1, l2, l3, l4, w2, th2) {
+        function solveFourBar(l1, l2, l3, l4, w2, th2, assembly) {
             const k1 = l1/l2; const k2 = l1/l4; const k3 = (l1*l1 + l2*l2 - l3*l3 + l4*l4) / (2*l2*l4);
             const A = Math.cos(th2) - k1 - k2*Math.cos(th2) + k3;
             const B = -2*Math.sin(th2);
@@ -275,8 +273,8 @@ else:
             const disc = B*B - 4*A*C;
             if (disc < 0) return null;
             
-            // Hardcoded strictly to crossed mechanism (- Math.sqrt)
-            const th4 = 2 * Math.atan((-B - Math.sqrt(disc)) / (2*A));
+            // Apply Assembly Mode (+1 for Open, -1 for Crossed)
+            const th4 = 2 * Math.atan((-B + assembly * Math.sqrt(disc)) / (2*A));
             const th3 = Math.atan2(l4*Math.sin(th4) - l2*Math.sin(th2), l1 + l4*Math.cos(th4) - l2*Math.cos(th2));
             const den = Math.sin(th3 - th4);
             if (Math.abs(den) < 1e-5) return null;
@@ -342,12 +340,12 @@ else:
             } else {
                 thHTML = `<tr><th class="p-2">Angle</th><th class="p-2">ω3 (Coupler)</th><th class="p-2">ω4 (Follower)</th><th class="p-2">α3</th><th class="p-2">α4</th></tr>`;
                 state.angles.forEach(deg => {
-                    const r = solveFourBar(state.fourbar.l1, state.fourbar.l2, state.fourbar.l3, state.fourbar.l4, state.fourbar.w2, deg * Math.PI/180);
+                    const r = solveFourBar(state.fourbar.l1, state.fourbar.l2, state.fourbar.l3, state.fourbar.l4, state.fourbar.w2, deg * Math.PI/180, state.fourbar.assembly);
                     if(r) tbHTML += `<tr class="border-b"><td class="p-2">${deg}°</td><td class="p-2">${r.w3.toFixed(2)}</td><td class="p-2">${r.w4.toFixed(2)}</td><td class="p-2">${r.alp3.toFixed(2)}</td><td class="p-2">${r.alp4.toFixed(2)}</td></tr>`;
                     else tbHTML += `<tr><td class="p-2">${deg}°</td><td colspan="4" class="p-2 text-red-500">Locked</td></tr>`;
                 });
                 for(let i=0; i<=360; i+=5) {
-                    gData.lbls.push(i); const r = solveFourBar(state.fourbar.l1, state.fourbar.l2, state.fourbar.l3, state.fourbar.l4, state.fourbar.w2, i * Math.PI/180);
+                    gData.lbls.push(i); const r = solveFourBar(state.fourbar.l1, state.fourbar.l2, state.fourbar.l3, state.fourbar.l4, state.fourbar.w2, i * Math.PI/180, state.fourbar.assembly);
                     gData.y1.push(r ? r.w3 : null); gData.y2.push(r ? r.w4 : null);
                     gData.y3.push(r ? r.alp3 : null); gData.y4.push(r ? r.alp4 : null);
                 }
@@ -416,7 +414,7 @@ else:
                 let d = Math.sqrt(l1*l1 + l2*l2 - 2*l1*l2*Math.cos(nx));
                 if(d > l3+l4 || d < Math.abs(l3-l4)) state.dir *= -1;
                 else state.theta = (nx + 2*Math.PI) % (2*Math.PI);
-                document.getElementById('mech-status').innerText = "Four-Bar Linkage";
+                document.getElementById('mech-status').innerText = state.fourbar.assembly === 1 ? "Four-Bar Linkage (Open)" : "Four-Bar Linkage (Crossed)";
             }
         }
 
@@ -447,9 +445,9 @@ else:
                         const a = (l3*l3 - l4*l4 + d*d) / (2*d); const h = Math.sqrt(Math.max(0, l3*l3 - a*a));
                         const pX = xA + a*(l1-xA)/d; const pY = yA + a*(0-yA)/d;
                         
-                        // Hardcoded strictly to crossed mechanism (-h)
-                        const xB = pX - h*(0-yA)/d; 
-                        const yB = pY + h*(l1-xA)/d;
+                        // Apply assembly mode to drawing coordinate intersection logic
+                        const xB = pX + state.fourbar.assembly * h*(0-yA)/d; 
+                        const yB = pY - state.fourbar.assembly * h*(l1-xA)/d;
                         
                         drawLine(0,0, l1,0, '#cbd5e1', 12/sc);
                         drawLine(0,0, xA,yA, '#0d9488', 8/sc);
